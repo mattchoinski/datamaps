@@ -6,7 +6,7 @@
 
   var defaultOptions = {
     scope: '__DEFAULT__',
-    responsive: false,
+    responsive: true,
     aspectRatio: 0.5625,
     setProjection: setProjection,
     projection: 'equirectangular',
@@ -25,7 +25,7 @@
         borderOpacity: 1,
         borderColor: '#FDFDFD',
         popupTemplate: function(geography, data) {
-          return '<div class="hoverinfo"><strong>' + geography.properties.name + '</strong></div>';
+          return "<div class=\"info\">" + geography.properties.name + "</div>";
         },
         popupOnHover: true,
         highlightOnHover: true,
@@ -44,7 +44,7 @@
         popupOnHover: true,
         radius: null,
         popupTemplate: function(geography, data) {
-          return '<div class="hoverinfo"><strong>' + data.name + '</strong></div>';
+          return data.name;
         },
         fillOpacity: 0.75,
         animate: true,
@@ -154,13 +154,6 @@
     return {path: path, projection: projection};
   }
 
-  function addStyleBlock() {
-    if ( d3.select('.datamaps-style-block').empty() ) {
-      d3.select('head').append('style').attr('class', 'datamaps-style-block')
-      .html('.datamap path.datamaps-graticule { fill: none; stroke: #777; stroke-width: 0.5px; stroke-opacity: .5; pointer-events: none; } .datamap .labels {pointer-events: none;} .datamap path {stroke: #FFFFFF; stroke-width: 1px;} .datamaps-legend dt, .datamaps-legend dd { float: left; margin: 0 3px 0 0;} .datamaps-legend dd {width: 20px; margin-right: 6px; border-radius: 3px;} .datamaps-legend {padding-bottom: 20px; z-index: 1001; position: absolute; left: 4px; font-size: 12px; font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;} .datamaps-hoverover {display: none; font-family: "Helvetica Neue", Helvetica, Arial, sans-serif; } .hoverinfo {padding: 4px; border-radius: 1px; background-color: #FFF; box-shadow: 1px 1px 5px #CCC; font-size: 12px; border: 1px solid #CCC; } .hoverinfo hr {border:1px dotted #CCC; }');
-    }
-  }
-
   function drawSubunits( data ) {
     var fillData = this.options.fills,
         colorCodeData = this.options.data || {},
@@ -266,135 +259,13 @@
             }
           }
           $this.on('mousemove', null);
-          d3.selectAll('.datamaps-hoverover').style('display', 'none');
+          d3.selectAll('.datamaps-hover').style('display', 'none');
         });
     }
 
     function moveToFront() {
       this.parentNode.appendChild(this);
     }
-  }
-
-  //plugin to add a simple map legend
-  function addLegend(layer, data, options) {
-    data = data || {};
-    if ( !this.options.fills ) {
-      return;
-    }
-
-    var html = '<dl>';
-    var label = '';
-    if ( data.legendTitle ) {
-      html = '<h2>' + data.legendTitle + '</h2>' + html;
-    }
-    for ( var fillKey in this.options.fills ) {
-
-      if ( fillKey === 'defaultFill') {
-        if (! data.defaultFillName ) {
-          continue;
-        }
-        label = data.defaultFillName;
-      } else {
-        if (data.labels && data.labels[fillKey]) {
-          label = data.labels[fillKey];
-        } else {
-          label= fillKey + ': ';
-        }
-      }
-      html += '<dt>' + label + '</dt>';
-      html += '<dd style="background-color:' +  this.options.fills[fillKey] + '">&nbsp;</dd>';
-    }
-    html += '</dl>';
-
-    var hoverover = d3.select( this.options.element ).append('div')
-      .attr('class', 'datamaps-legend')
-      .html(html);
-  }
-
-    function addGraticule ( layer, options ) {
-      var graticule = d3.geo.graticule();
-      this.svg.insert("path", '.datamaps-subunits')
-        .datum(graticule)
-        .attr("class", "datamaps-graticule")
-        .attr("d", this.path);
-  }
-
-  function handleArcs (layer, data, options) {
-    var self = this,
-        svg = this.svg;
-
-    if ( !data || (data && !data.slice) ) {
-      throw "Datamaps Error - arcs must be an array";
-    }
-
-    // For some reason arc options were put in an `options` object instead of the parent arc
-    // I don't like this, so to match bubbles and other plugins I'm moving it
-    // This is to keep backwards compatability
-    for ( var i = 0; i < data.length; i++ ) {
-      data[i] = defaults(data[i], data[i].options);
-      delete data[i].options;
-    }
-
-    if ( typeof options === "undefined" ) {
-      options = defaultOptions.arcConfig;
-    }
-
-    var arcs = layer.selectAll('path.datamaps-arc').data( data, JSON.stringify );
-
-    var path = d3.geo.path()
-        .projection(self.projection);
-
-    arcs
-      .enter()
-        .append('svg:path')
-        .attr('class', 'datamaps-arc')
-        .style('stroke-linecap', 'round')
-        .style('stroke', function(datum) {
-          return val(datum.strokeColor, options.strokeColor, datum);
-        })
-        .style('fill', 'none')
-        .style('stroke-width', function(datum) {
-            return val(datum.strokeWidth, options.strokeWidth, datum);
-        })
-        .attr('d', function(datum) {
-            var originXY = self.latLngToXY(val(datum.origin.latitude, datum), val(datum.origin.longitude, datum))
-            var destXY = self.latLngToXY(val(datum.destination.latitude, datum), val(datum.destination.longitude, datum));
-            var midXY = [ (originXY[0] + destXY[0]) / 2, (originXY[1] + destXY[1]) / 2];
-            if (options.greatArc) {
-                  // TODO: Move this to inside `if` clause when setting attr `d`
-              var greatArc = d3.geo.greatArc()
-                  .source(function(d) { return [val(d.origin.longitude, d), val(d.origin.latitude, d)]; })
-                  .target(function(d) { return [val(d.destination.longitude, d), val(d.destination.latitude, d)]; });
-
-              return path(greatArc(datum))
-            }
-            var sharpness = val(datum.arcSharpness, options.arcSharpness, datum);
-            return "M" + originXY[0] + ',' + originXY[1] + "S" + (midXY[0] + (50 * sharpness)) + "," + (midXY[1] - (75 * sharpness)) + "," + destXY[0] + "," + destXY[1];
-        })
-        .attr('data-info', function(datum) {
-          return JSON.stringify(datum);
-        })
-        .transition()
-          .delay(100)
-          .style('fill', function(datum) {
-            /*
-              Thank you Jake Archibald, this is awesome.
-              Source: http://jakearchibald.com/2013/animated-line-drawing-svg/
-            */
-            var length = this.getTotalLength();
-            this.style.transition = this.style.WebkitTransition = 'none';
-            this.style.strokeDasharray = length + ' ' + length;
-            this.style.strokeDashoffset = length;
-            this.getBoundingClientRect();
-            this.style.transition = this.style.WebkitTransition = 'stroke-dashoffset ' + val(datum.animationSpeed, options.animationSpeed, datum) + 'ms ease-out';
-            this.style.strokeDashoffset = '0';
-            return 'none';
-          })
-
-    arcs.exit()
-      .transition()
-      .style('opacity', 0)
-      .remove();
   }
 
   function handleLabels ( layer, options ) {
@@ -449,7 +320,7 @@
   }
 
 
-  function handleBubbles (layer, data, options ) {
+  function handleBubbles (layer, data, options) {
     var self = this,
         fillData = this.options.fills,
         filterData = this.options.filters,
@@ -459,12 +330,12 @@
       throw "Datamaps Error - bubbles must be an array";
     }
 
-    var bubbles = layer.selectAll('circle.datamaps-bubble').data( data, options.key );
+    var bubbles = layer.selectAll("circle.bubble").data(data, options.key);
 
     bubbles
       .enter()
         .append('svg:circle')
-        .attr('class', 'datamaps-bubble')
+        .attr('class', 'bubble')
         .attr('cx', function ( datum ) {
           var latLng;
           if ( datumHasCoords(datum) ) {
@@ -511,10 +382,12 @@
         .style('fill-opacity', function ( datum ) {
           return val(datum.fillOpacity, options.fillOpacity, datum);
         })
+/*
         .style('fill', function ( datum ) {
           var fillColor = fillData[ val(datum.fillKey, options.fillKey, datum) ];
           return fillColor || fillData.defaultFill;
         })
+ */
         .on('mouseover', function ( datum ) {
           var $this = d3.select(this);
 
@@ -551,7 +424,8 @@
             }
           }
 
-          d3.selectAll('.datamaps-hoverover').style('display', 'none');
+          //d3.selectAll('.datamaps-hoverover').style('display', 'none');
+          d3.selectAll('.hover').style('display', 'none');
         })
 
     bubbles.transition()
@@ -565,11 +439,11 @@
         return JSON.stringify(d);
       });
 
-    bubbles.exit()
-      .transition()
-        .delay(options.exitDelay)
-        .attr("r", 0)
-        .remove();
+	bubbles.exit()
+		.transition()
+		.delay(options.exitDelay)
+		.attr("r", 0)
+		.remove();
 
     function datumHasCoords (datum) {
       return typeof datum !== 'undefined' && typeof datum.latitude !== 'undefined' && typeof datum.longitude !== 'undefined';
@@ -610,15 +484,7 @@
 
     /* Add core plugins to this instance */
     this.addPlugin('bubbles', handleBubbles);
-    this.addPlugin('legend', addLegend);
-    this.addPlugin('arc', handleArcs);
     this.addPlugin('labels', handleLabels);
-    this.addPlugin('graticule', addGraticule);
-
-    //append style block with basic hoverover styles
-    if ( ! this.options.disableDefaultStyles ) {
-      addStyleBlock();
-    }
 
     return this.draw();
   }
@@ -683,10 +549,8 @@
         handleGeographyConfig.call(self);
 
         if ( self.options.geographyConfig.popupOnHover || self.options.bubblesConfig.popupOnHover) {
-          hoverover = d3.select( self.options.element ).append('div')
-            .attr('class', 'datamaps-hoverover')
-            .style('z-index', 10001)
-            .style('position', 'absolute');
+          hoverover = d3.select( self.options.element ).append('span')
+            .attr('class', 'hover');
         }
 
         //fire off finished callback
@@ -1014,7 +878,8 @@
     element.on('mousemove', null);
     element.on('mousemove', function() {
       var position = d3.mouse(self.options.element);
-      d3.select(self.svg[0][0].parentNode).select('.datamaps-hoverover')
+      //d3.select(self.svg[0][0].parentNode).select('.datamaps-hoverover')
+      d3.select(self.svg[0][0].parentNode).select('.hover')
         .style('top', ( (position[1] + 30)) + "px")
         .html(function() {
           var data = JSON.parse(element.attr('data-info'));
@@ -1027,7 +892,8 @@
         .style('left', ( position[0]) + "px");
     });
 
-    d3.select(self.svg[0][0].parentNode).select('.datamaps-hoverover').style('display', 'block');
+    //d3.select(self.svg[0][0].parentNode).select('.datamaps-hoverover').style('display', 'block');
+    d3.select(self.svg[0][0].parentNode).select('.hover').style('display', 'block');
   };
 
   Datamap.prototype.addPlugin = function( name, pluginFn ) {
